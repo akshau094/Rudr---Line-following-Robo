@@ -1,0 +1,280 @@
+// =====================================================
+// CONTINUOUS FINAL LINE FOLLOWER
+// Arduino UNO + L298N + 5 IR SENSOR
+// FIXED CONNECTIONS
+// WHITE LINE + BLACK SURFACE
+// =====================================================
+
+
+// ---------- L298N ----------
+
+#define ENA 5
+#define ENB 6
+
+#define IN1 7
+#define IN2 8
+
+#define IN3 9
+#define IN4 10
+
+
+// ---------- IR ----------
+
+#define S1 A0
+#define S2 A1
+#define S3 A2
+#define S4 A3
+#define S5 A4
+
+
+// ---------- THRESHOLD ----------
+
+#define BLACK_THRESHOLD 500
+
+
+// ---------- CALIBRATED BASE SPEED ----------
+
+const int LEFT_BASE  = 155;
+const int RIGHT_BASE = 140;
+
+
+// ---------- CORRECTION ----------
+
+const int LEFT_SLOW   = 105;
+const int RIGHT_SLOW  = 90;
+
+const int LEFT_FAST   = 180;
+const int RIGHT_FAST  = 165;
+
+
+// Last direction:
+// -1 = left
+//  0 = center
+// +1 = right
+
+int lastDirection = 0;
+
+
+// =====================================================
+// LEFT MOTOR
+// =====================================================
+
+void leftMotor(int speed)
+{
+  speed = constrain(speed, 0, 255);
+
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+
+  analogWrite(ENA, speed);
+}
+
+
+// =====================================================
+// RIGHT MOTOR
+// =====================================================
+
+void rightMotor(int speed)
+{
+  speed = constrain(speed, 0, 255);
+
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+
+  analogWrite(ENB, speed);
+}
+
+
+// =====================================================
+// SETUP
+// =====================================================
+
+void setup()
+{
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  pinMode(S1, INPUT);
+  pinMode(S2, INPUT);
+  pinMode(S3, INPUT);
+  pinMode(S4, INPUT);
+  pinMode(S5, INPUT);
+
+
+  // Start moving immediately
+
+  leftMotor(LEFT_BASE);
+  rightMotor(RIGHT_BASE);
+
+  delay(500);
+}
+
+
+// =====================================================
+// MAIN LOOP
+// =====================================================
+
+void loop()
+{
+
+  // ===================================================
+  // WHITE LINE DETECTION
+  // ===================================================
+  // WHITE = HIGH VALUE
+  // BLACK = LOW VALUE
+  //
+  // Therefore:
+  // White line -> analogRead > BLACK_THRESHOLD
+  // ===================================================
+
+  bool s1 = analogRead(S1) > BLACK_THRESHOLD;
+  bool s2 = analogRead(S2) > BLACK_THRESHOLD;
+  bool s3 = analogRead(S3) > BLACK_THRESHOLD;
+  bool s4 = analogRead(S4) > BLACK_THRESHOLD;
+  bool s5 = analogRead(S5) > BLACK_THRESHOLD;
+
+
+  // =================================================
+  // CENTER
+  // =================================================
+
+  if (s3 && !s1 && !s2 && !s4 && !s5)
+  {
+    leftMotor(LEFT_BASE);
+    rightMotor(RIGHT_BASE);
+
+    lastDirection = 0;
+  }
+
+
+  // =================================================
+  // SLIGHT LEFT
+  // =================================================
+
+  else if (s2 && !s1)
+  {
+    leftMotor(LEFT_SLOW);
+    rightMotor(RIGHT_FAST);
+
+    lastDirection = -1;
+  }
+
+
+  // =================================================
+  // HARD LEFT
+  // =================================================
+
+  else if (s1)
+  {
+    leftMotor(75);
+    rightMotor(LEFT_FAST);
+
+    lastDirection = -1;
+  }
+
+
+  // =================================================
+  // SLIGHT RIGHT
+  // =================================================
+
+  else if (s4 && !s5)
+  {
+    leftMotor(LEFT_FAST);
+    rightMotor(RIGHT_SLOW);
+
+    lastDirection = 1;
+  }
+
+
+  // =================================================
+  // HARD RIGHT
+  // =================================================
+
+  else if (s5)
+  {
+    leftMotor(RIGHT_FAST);
+    rightMotor(70);
+
+    lastDirection = 1;
+  }
+
+
+  // =================================================
+  // S2 + S3
+  // =================================================
+
+  else if (s2 && s3)
+  {
+    leftMotor(115);
+    rightMotor(155);
+
+    lastDirection = -1;
+  }
+
+
+  // =================================================
+  // S3 + S4
+  // =================================================
+
+  else if (s3 && s4)
+  {
+    leftMotor(165);
+    rightMotor(105);
+
+    lastDirection = 1;
+  }
+
+
+  // =================================================
+  // MULTIPLE SENSORS
+  // =================================================
+
+  else if (s1 || s2 || s3 || s4 || s5)
+  {
+    // NEVER STOP
+
+    leftMotor(145);
+    rightMotor(130);
+  }
+
+
+  // =================================================
+  // LINE TEMPORARILY LOST
+  // =================================================
+
+  else
+  {
+    // DO NOT STOP.
+    // Search in the last known direction.
+
+    if (lastDirection < 0)
+    {
+      leftMotor(75);
+      rightMotor(155);
+    }
+
+    else if (lastDirection > 0)
+    {
+      leftMotor(165);
+      rightMotor(70);
+    }
+
+    else
+    {
+      // No previous direction:
+      // continue straight slowly.
+
+      leftMotor(120);
+      rightMotor(110);
+    }
+  }
+
+
+  delay(5);
+}
